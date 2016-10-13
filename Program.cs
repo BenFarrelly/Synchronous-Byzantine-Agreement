@@ -19,7 +19,7 @@ namespace ByzantineAgreementSync
             // Private member-variables
             private T data;
              NodeList<T> neighbors = null;
-            public NodeList<T> children
+            public List<Node<T>> children
             {
                 get; set;
             }
@@ -27,16 +27,16 @@ namespace ByzantineAgreementSync
             public Node() { }
             public Node(T data)
             {
-                children = new NodeList<T>();
+                children = new List<Node<T>>();
                 this.data = data;
             }
             public Node(Node<T> parent, T data)
             {
                 this.parent = parent;
                 this.data = data;
-                children = new NodeList<T>();
+                children = new List<Node<T>>();
             }
-            public Node(T data, NodeList<T> children)
+            public Node(T data, List<Node<T>> children)
             {
                 this.data = data;
                 this.children = children;
@@ -57,6 +57,7 @@ namespace ByzantineAgreementSync
             {
                 children.Add(child);
                 child.parent = this;
+                
             }
 
            
@@ -77,7 +78,7 @@ namespace ByzantineAgreementSync
         }
         public void Add(Node<T> child)
         {
-                List.Add(child);
+                this.List.Add(child);
         }
 
        
@@ -137,7 +138,7 @@ namespace ByzantineAgreementSync
                 Init = init;
                 faulty = false;
                 script = null;
-                EIG = new Tree<int>(Init);
+                EIG = new Node<int>(Init);
                 var temp = N;
                
             }
@@ -150,14 +151,14 @@ namespace ByzantineAgreementSync
                 script = ByzScript;
                 
                 var temp = N;
-                EIG = new Tree<int>(Init);
+                EIG = new Node<int>(Init);
 
             }
             public int ID { get; private set; }
             public int Init { get; private set;}
             public bool faulty { get; private set; }
             public string[] script { get; private set; }
-            public Tree<int> EIG { get; private set; }
+            public Node<int> EIG { get; private set; }
 
             public int getValue(Node<int> node, int depth)
             {
@@ -204,9 +205,21 @@ namespace ByzantineAgreementSync
                 {
                     Console.WriteLine("Before receive: " + ID + " ,  " + i);
                     var msg = await inbox.Receive();
-                    if (msg.From > 2) Console.WriteLine("3  and 4 are making it through");
+                    Console.WriteLine(round + ": Receiving[" + ID + "]: Value: " + msg.Value + ", From: " + msg.From);
+                    var values = msg.Value.ToCharArray();
+                    var strValues = values.Select(x => x.ToString());
+                    foreach(var value in strValues)
+                    {
+                        var temp = Convert.ToInt32(value);
+                        this.EIG.AddChild(new Node<int>(temp));
+                       // Console.WriteLine("Child added");
+                       // Console.WriteLine("Successfully adding to tree");
+                    }
+                    //Console.WriteLine("The number of children in tree: " + this.EIG.children.Count );
+                    //Console.WriteLine("Finished adding to tree");
+                    //if (msg.From > 2) Console.WriteLine("3  and 4 are making it through");
                    // EIG.Add(msg.From, msg.Value);
-                    Console.WriteLine(round+": Receiving["+ID+ "]: Value: "+msg.Value+", From: " + msg.From);
+                    
                     //TODO put into tree-- - - - - 
                     //Receive message and put first round values into first row
                     //  if(msg.Value.Length > 1)
