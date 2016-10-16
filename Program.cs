@@ -24,7 +24,7 @@ namespace ByzantineAgreementSync
             {
                 get; set;
             }
-            Node<T> parent;
+            public Node<T> parent;
             public Node() { }
             public Node(T data, String ID)
             {
@@ -135,7 +135,7 @@ namespace ByzantineAgreementSync
             //  string[] ByzFaultyScript;
             //  Dictionary<string, Dictionary<string, Int32>> EIG;
 
-            public ByzProcess(int Id, int init)
+            public ByzProcess(int Id, int init, int VZero)
             {
                 ID = Id;
                 Init = init;
@@ -143,9 +143,10 @@ namespace ByzantineAgreementSync
                 script = null;
                 EIG = new Node<int>(Init, "");
                 var temp = N;
+                this.VZero = VZero;
                
             }
-            public ByzProcess(int Id, int init, bool ByzFaulty, string[] ByzScript)
+            public ByzProcess(int Id, int init, bool ByzFaulty, string[] ByzScript, int VZero)
             {
                 ID = Id;
                 Init = init;
@@ -155,6 +156,7 @@ namespace ByzantineAgreementSync
                 
                 var temp = N;
                 EIG = new Node<int>(Init, "");
+                this.VZero = VZero;
 
             }
             public int ID { get; private set; }
@@ -162,7 +164,7 @@ namespace ByzantineAgreementSync
             public bool faulty { get; private set; }
             public string[] script { get; private set; }
             public Node<int> EIG { get; private set; }
-
+            public int VZero { get; }
             public int getValue(Node<int> node, int depth)
             {
                 //Get the required values from the EIG tree, essentially, get the next NodeList Values
@@ -172,7 +174,7 @@ namespace ByzantineAgreementSync
                  // concatenate all values together, then return this to send the message
                 foreach(Node<int> child in node.children )
                 {
-                    Console.WriteLine("Child "+child.ToString());
+                    //Console.WriteLine("Child "+child.ToString());
                     if(depth == round)
                     {
                         return child.Value;
@@ -201,6 +203,41 @@ namespace ByzantineAgreementSync
                 }
                 return result;
             }
+            public String getOutput(int level, Node<int> node, String result)
+            {
+                if (level != 1)
+                {
+                    //Console.WriteLine("Before loop");
+
+                    foreach (Node<int> child in node.children)
+                    {
+                        // Console.WriteLine("At loop: " + i++);
+                        result += getLevel(level - 1, child, " ");
+                    }
+                   // result += " ";
+                }
+                else
+                {
+                    return node.Value.ToString();
+                }
+                return result;
+            }
+            public Node<int> getLevel(int level, Node<int>node )
+            {
+                if (level != 1)
+                {
+                    foreach (Node<int> child in node.children)
+                    {
+                        return getLevel(level - 1, child);
+                    }
+                }
+                else
+                {
+                    return node;
+                }
+                return null;
+            }
+
             public Node<int> GetLeaves(Node<int> parent)
             {
                 if(parent.children.Count == 0)
@@ -234,13 +271,81 @@ namespace ByzantineAgreementSync
                     }
                 }
             }
-            public void GetLeavesFromSubTree(int ID, List<Node<int>> leaves)
+            
+
+            
+            public void Evaluate(Node<int> node)
             {
+                //Finds the majority value amongst it's children
+                
+                foreach(var child in node.children)
+                {
+                    if(child.children.Count == 0)
+                    {
+                       // Console.WriteLine("{1} Initial value: {0}", node.Value, node.GetHashCode());
+                        node.Value = Majority(child.parent.children);
+                       // Console.WriteLine("{1} Value changed to: {0}", node.Value, node.GetHashCode());
+                    }
+                    else
+                    {
+                        Evaluate(child);
+                    }
+                }
+
                 
             }
+            public int Majority(List<Node<int>> list)
+            {
+                int ZeroCount = 0;
+                int OneCount = 0;
+                foreach(var value in list)
+                {
+                    if(value.Value == 1)
+                    {
+                        OneCount++;
+                    }
+                    else if(value.Value == 0)
+                    {
+                        ZeroCount++;
+                    }
+                    else
+                    {
+                        if(this.VZero == 1)
+                        {
+                            OneCount++;
+                        } 
+                        else if( this.VZero == 0)
+                        {
+                            ZeroCount++;
+                        }
 
+                    }
 
-
+                }
+                if(OneCount > ZeroCount)
+                {
+                    return 1;
+                }
+                else if(ZeroCount > OneCount)
+                {
+                    return 0;
+                }
+                else if(ZeroCount == OneCount)
+                {
+                    return VZero;
+                }
+                return VZero;
+            }
+            public void GenerateOutput()
+            {
+                
+                Console.Write(round + " " + ID+" : " );
+                for(int i = NumberOfRounds; i >= 0; i--)
+                {
+                    var level = String.Concat( getLevel(i+1, EIG, ""));
+                    Console.Write(level + " ");
+                }
+            }
             public async Task ByzBody (MailboxProcessor<Message> inbox)
             {
                 
@@ -257,7 +362,7 @@ namespace ByzantineAgreementSync
                    // Console.WriteLine("Message value: " + mess);
                     var msg = new Message(ID, mess);
                         Byz[i].Post(msg);
-                        Console.WriteLine(round + " [" + ID + "]: Posting: " + msg.Value + " to " + (i + 1));
+                      //  Console.WriteLine(round + " [" + ID + "]: Posting: " + msg.Value + " to " + (i + 1));
                   //  }
                   //  else
                   //  {
@@ -278,9 +383,9 @@ namespace ByzantineAgreementSync
                 var leavesQueue = new Queue<Node<int>>(leaves);
                 for (var i = 0; i < N; i++)
                 {
-                    Console.WriteLine("Before receive: " + ID + " ,  " + i);
+                   // Console.WriteLine("Before receive: " + ID + " ,  " + i);
                     var msg = await inbox.Receive();
-                    Console.WriteLine(round + ": Receiving[" + ID + "]: Value: " + msg.Value + ", From: " + msg.From);
+                  //  Console.WriteLine(round + ": Receiving[" + ID + "]: Value: " + msg.Value + ", From: " + msg.From);
                     var values = msg.Value.ToCharArray();
                     var receivedValues = values.Select(x => x.ToString()).ToList<String>();
                     
@@ -406,10 +511,7 @@ namespace ByzantineAgreementSync
             
         }
 
-    void Evaluation(ByzProcess[] generals)
-        {
-
-        }
+    
     static ByzProcess[] readGenerals(string[] generals)
     {
        // int NumberOfNodes;
@@ -442,13 +544,13 @@ namespace ByzantineAgreementSync
                         //For creating string[] from script
                         script[j - 2] = temp[j];
                     }
-                    Byzantines[i] = new ByzProcess(id, init, true, script);
+                    Byzantines[i] = new ByzProcess(id, init, true, script, VZero);
                 }
                 else
                 {
                     Faulty = false;
                     //Not faulty, therefore do not need to create script
-                    Byzantines[i] = new ByzProcess(id, init);
+                    Byzantines[i] = new ByzProcess(id, init, VZero);
                 }
 
 
@@ -468,11 +570,12 @@ namespace ByzantineAgreementSync
            
         if (args.Length == 1)
         {
-
+             
             string path = args[0];
             string[] content = System.IO.File.ReadAllLines(path);
             ByzProcess[] generals = readGenerals(content);
-            Console.Out.WriteLine("The first byzantine is: " + generals[0].ID);
+            
+          //  Console.Out.WriteLine("The first byzantine is: " + generals[0].ID);
             CompletionCount = N = generals.Length;
             NumberOfRounds = (N / 3) + 1;
             Completion = new TaskCompletionSource<bool>();
@@ -493,7 +596,7 @@ namespace ByzantineAgreementSync
                 }
 
             Completion.Task.Wait();
-            Console.WriteLine("Finished "+round+ " round messaging");
+        //    Console.WriteLine("Finished "+round+ " round messaging");
             Thread.Sleep(1000);
 
                     /*    Byz2 = new MailboxProcessor<Message2>[N];
@@ -511,7 +614,38 @@ namespace ByzantineAgreementSync
 
                             Completion.Task.Wait();
                             Console.WriteLine("Finished second round messaging");*/
+                    for(int n = 0; n < N; n++)
+                    {
+                        //Generate output for the current level
+
+                        var result = String.Concat(generals[n].getOutput(round+1, generals[n].EIG, ""));
+                        if(round == 1)
+                        {
+                            var result2 = result.Aggregate(string.Empty, (c, i) => c + i + ' ');
+                            result = " " + result2;
+                        }
+                        Console.Write(round + " " + generals[n].ID + " >" + result);
+                        Console.WriteLine();
+                    }
                     round++;
+                }
+           for(int i = 0; i< N; i++)
+                {
+                    /* for(int j = NumberOfRounds-1; j > 0; j--)
+                     {
+                         var x = generals[i].getLevel(j, generals[i].EIG);
+                         Console.WriteLine("{0}General: {1}", i, x);
+                     }*/
+                 //   Console.WriteLine();
+                 //   Console.WriteLine("Before evaluation");
+           //        generals[i].GenerateOutput();
+                    
+                    generals[i].Evaluate(generals[i].EIG);
+                    generals[i].EIG.Value = generals[i].Majority(generals[i].EIG.children);
+                 
+                    //Console.WriteLine("After Evaluation");
+                   generals[i].GenerateOutput();
+                    Console.WriteLine();
                 }
                 Console.Read();
             }
