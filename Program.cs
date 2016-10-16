@@ -1,5 +1,5 @@
 ﻿using Actress;
-using Akka.Actor;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -156,8 +156,8 @@ namespace ByzantineAgreementSync
                 
                 var temp = N;
                 EIG = new Node<int>(Init, "");
-                var fakeEIG = new Node<int>(Init, "");
-                generateTreeFromScript(script, EIG);
+                fakeEIG = new Node<int>(Init, "");
+             //   generateTreeFromScript(script, fakeEIG);
                 this.VZero = VZero;
 
             }
@@ -166,6 +166,7 @@ namespace ByzantineAgreementSync
             public bool faulty { get; private set; }
             public List<String> script { get; private set; }
             public Node<int> EIG { get; private set; }
+            public Node<int> fakeEIG { get; private set; }
             public int VZero { get; }
 
             
@@ -191,13 +192,13 @@ namespace ByzantineAgreementSync
                 }
                 return 70;
             }
-            public void generateTreeFromScript(List<String> script, Node<int> EIG)
+            public void generateTreeFromScript(List<String> script, Node<int> fakeEIG)
             {
 
                 for (int i = 1; i <= NumberOfRounds; i++)
                 {
                     var leaves = new List<Node<int>>();
-                    FindLeaves(EIG, leaves);
+                    FindLeaves(fakeEIG, leaves);
                     var leafQueue = new Queue<Node<int>>(leaves);
 
                     List<String> currentScript = script.GetRange(((i-1 )* N), N);
@@ -229,7 +230,13 @@ namespace ByzantineAgreementSync
                             var leaf = leafQueue.Dequeue();
                             for (int j = 1; j < N; j++)
                             {
-                                leaf.AddChild(new Node<int>(Convert.ToInt32(addingToLeaf[((k*(N-1))+j)-1]), ""));
+                                try
+                                {
+                                    leaf.AddChild(new Node<int>(Convert.ToInt32(addingToLeaf[((k * (N - 1)) + j) - 1]), ""));
+                                }catch(ArgumentOutOfRangeException e)
+                                {
+
+                                }
                             }
                             // for (int j = 0; j < storedValues.Length; j++)
                             //  {
@@ -411,10 +418,16 @@ namespace ByzantineAgreementSync
                     //    if(round == 1)
                     //    {
                     //var msg = new Message(ID, Init+"");
-                   // Console.WriteLine("Before getting level: " + i);
-                    var mess = String.Concat(getLevel(round, this.EIG, ""));
-                   
-
+                    // Console.WriteLine("Before getting level: " + i);
+                    string mess = "";
+                    if (!this.faulty)
+                    {
+                         mess = String.Concat(getLevel(round, this.EIG, ""));
+                    }
+                    else if (this.faulty)
+                    {
+                        mess = String.Concat(getLevel(round, this.fakeEIG, ""));
+                    }
                    // var mes = mess.Append(getLevel(round, this.EIG)).ToString();
                    // Console.WriteLine("Message value: " + mess);
                     var msg = new Message(ID, mess);
@@ -446,8 +459,7 @@ namespace ByzantineAgreementSync
                     var values = msg.Value.ToCharArray();
                     var receivedValues = values.Select(x => x.ToString()).ToList<String>();
 
-                    if (!this.faulty)
-                    {
+                    
 
 
                         if (round == 1)
@@ -537,7 +549,7 @@ namespace ByzantineAgreementSync
                         // }
 
                     }
-                }
+                
                 //This is the synchronizer, start round two afterwards?
 
                 var count = Interlocked.Decrement(ref CompletionCount);
@@ -641,7 +653,7 @@ namespace ByzantineAgreementSync
                 {
                     if (general.faulty)
                     {
-                        general.generateTreeFromScript(general.script, general.EIG);
+                        general.generateTreeFromScript(general.script, general.fakeEIG);
                     }
                 }
             Completion = new TaskCompletionSource<bool>();
