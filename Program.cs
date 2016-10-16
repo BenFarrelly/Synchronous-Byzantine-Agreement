@@ -146,7 +146,7 @@ namespace ByzantineAgreementSync
                 this.VZero = VZero;
                
             }
-            public ByzProcess(int Id, int init, bool ByzFaulty, string[] ByzScript, int VZero)
+            public ByzProcess(int Id, int init, bool ByzFaulty, List<String> ByzScript, int VZero)
             {
                 ID = Id;
                 Init = init;
@@ -156,15 +156,20 @@ namespace ByzantineAgreementSync
                 
                 var temp = N;
                 EIG = new Node<int>(Init, "");
+                var fakeEIG = new Node<int>(Init, "");
+                generateTreeFromScript(script, EIG);
                 this.VZero = VZero;
 
             }
             public int ID { get; private set; }
             public int Init { get; private set;}
             public bool faulty { get; private set; }
-            public string[] script { get; private set; }
+            public List<String> script { get; private set; }
             public Node<int> EIG { get; private set; }
             public int VZero { get; }
+
+            
+
             public int getValue(Node<int> node, int depth)
             {
                 //Get the required values from the EIG tree, essentially, get the next NodeList Values
@@ -185,6 +190,58 @@ namespace ByzantineAgreementSync
                     }
                 }
                 return 70;
+            }
+            public void generateTreeFromScript(List<String> script, Node<int> EIG)
+            {
+
+                for (int i = 1; i <= NumberOfRounds; i++)
+                {
+                    var leaves = new List<Node<int>>();
+                    FindLeaves(EIG, leaves);
+                    var leafQueue = new Queue<Node<int>>(leaves);
+
+                    List<String> currentScript = script.GetRange(((i-1 )* N), N);
+                    List<int> addingToLeaf = new List<int>();
+                    if (i == 1)
+                    {
+                        var leaf = leafQueue.Dequeue();
+                        foreach (String x in currentScript)
+                        {
+                            
+                                leaf.AddChild(new Node<int>(Convert.ToInt32(x), ""));
+                            
+                        }
+                        
+                       
+                    }
+                    else
+                    {
+                        foreach (String x in currentScript)
+                        {
+                            var temp = x.ToCharArray();
+                            foreach (Char c in temp)
+                            {
+                                addingToLeaf.Add(Convert.ToInt32(c.ToString()));
+                            }
+                        }
+                        for (int k = 0; k < leaves.Count; k++)
+                        {
+                            var leaf = leafQueue.Dequeue();
+                            for (int j = 1; j < N; j++)
+                            {
+                                leaf.AddChild(new Node<int>(Convert.ToInt32(addingToLeaf[((k*(N-1))+j)-1]), ""));
+                            }
+                            // for (int j = 0; j < storedValues.Length; j++)
+                            //  {
+                            //      var leaf = leavesQueue.Dequeue();
+                            //      for (int k = 0; k < N - 1; k++)
+                            //      {
+                            //          leaf.AddChild(new Node<int>(Convert.ToInt32(storedValues[j]), leaf.id + "." + msg.From));
+                            //      }
+                            //  }
+                        }
+                    }
+                }
             }
             public String getLevel(int level, Node<int> node, String result)
             {
@@ -383,101 +440,103 @@ namespace ByzantineAgreementSync
                 var leavesQueue = new Queue<Node<int>>(leaves);
                 for (var i = 0; i < N; i++)
                 {
-                   // Console.WriteLine("Before receive: " + ID + " ,  " + i);
+                    // Console.WriteLine("Before receive: " + ID + " ,  " + i);
                     var msg = await inbox.Receive();
-                  //  Console.WriteLine(round + ": Receiving[" + ID + "]: Value: " + msg.Value + ", From: " + msg.From);
+                    //  Console.WriteLine(round + ": Receiving[" + ID + "]: Value: " + msg.Value + ", From: " + msg.From);
                     var values = msg.Value.ToCharArray();
                     var receivedValues = values.Select(x => x.ToString()).ToList<String>();
-                    
-                    
-                     
-                   
-                    if (round == 1)
-                    { 
-                    foreach (var value in receivedValues)
-                        {
-                            var temp = Convert.ToInt32(value);
-                            this.EIG.AddChild(new Node<int>(temp, msg.From.ToString()));
-                            // Console.WriteLine("Child added");
-                            // Console.WriteLine("Successfully adding to tree");
-                        }
-                    }
-                    else
+
+                    if (!this.faulty)
                     {
-                        //Need to remove the value that is from the node that is being stored
-                        // Each leaf should not get the value from the node they represent
-                        //E.G., if Node 1 is sending 0011 (where N=4), then the first leaf should
-                        //have 011.
-                        //If Node 3, sends 0011, then each third leaf will store 001
-                        var storedValues = receivedValues.ToArray();
-                        for (int j = msg.From-1; j < receivedValues.Count; j+=N)
-                        {
-                            storedValues[j] = null;
-                        }
-                        storedValues = storedValues.Where(x => x != null).ToArray<String>();
-                        //Now stored values does not include those from the ID
-                        // Console.WriteLine("Values to be stored: ");
-                        // foreach(var x in storedValues) { Console.WriteLine(x + " ,  "); }
-                        //problem with adding, for some reason not adding into final leaf
-                        //Change trying, (msg.From*(round-1)*(N-1)-> (msg.From*(round-1)*(N)
 
-                        //var leafQueue = new Queue<Node<int>>(leaves);
-                        //msg.Value is 0011 or something
-                        
-                        for(int j = 0; j < storedValues.Length; j++)
+
+                        if (round == 1)
                         {
-                            var leaf = leavesQueue.Dequeue();
-                            for(int k = 0; k < N-1; k++)
+                            foreach (var value in receivedValues)
                             {
-                                leaf.AddChild(new Node<int>(Convert.ToInt32(storedValues[j]), leaf.id +"."+msg.From));
+                                var temp = Convert.ToInt32(value);
+                                this.EIG.AddChild(new Node<int>(temp, msg.From.ToString()));
+                                // Console.WriteLine("Child added");
+                                // Console.WriteLine("Successfully adding to tree");
                             }
                         }
-
-
-                        //var leaves = new List<Node<int>>();
-                        //leaves.Add(GetLeaves(EIG));
-                        // (int r = ((msg.From-1 * (round - 1) * (N)) - (N)); r < (msg.From * (round - 1) * (N)); r++)
-                        //
-
-                      /*  for (int r = ((msg.From * (round - 1) * (N)) - (N)); r < (msg.From * (round - 1) * (N)); r++)
+                        else
                         {
-                            for (int c = 0; c < N-1; c++)
+                            //Need to remove the value that is from the node that is being stored
+                            // Each leaf should not get the value from the node they represent
+                            //E.G., if Node 1 is sending 0011 (where N=4), then the first leaf should
+                            //have 011.
+                            //If Node 3, sends 0011, then each third leaf will store 001
+                            var storedValues = receivedValues.ToArray();
+                            for (int j = msg.From - 1; j < receivedValues.Count; j += N)
                             {
-                               
-                                leaves[r].AddChild(new Node<int>(Convert.ToInt32(storedValues[c]), leaves[r].id + "."+ c.ToString()));
-                               
-                                //Console.WriteLine("Child added at: r={0}, c={1}, stopping val:{2} ", r, c, (msg.From * (round - 1) * (N)));
- 
+                                storedValues[j] = null;
                             }
-                           // strValues.RemoveRange(0, N - 1);
-                        }*/
-                    
+                            storedValues = storedValues.Where(x => x != null).ToArray<String>();
+                            //Now stored values does not include those from the ID
+                            // Console.WriteLine("Values to be stored: ");
+                            // foreach(var x in storedValues) { Console.WriteLine(x + " ,  "); }
+                            //problem with adding, for some reason not adding into final leaf
+                            //Change trying, (msg.From*(round-1)*(N-1)-> (msg.From*(round-1)*(N)
+
+                            //var leafQueue = new Queue<Node<int>>(leaves);
+                            //msg.Value is 0011 or something
+
+                            for (int j = 0; j < storedValues.Length; j++)
+                            {
+                                var leaf = leavesQueue.Dequeue();
+                                for (int k = 0; k < N - 1; k++)
+                                {
+                                    leaf.AddChild(new Node<int>(Convert.ToInt32(storedValues[j]), leaf.id + "." + msg.From));
+                                }//was storedvalues[j] previously
+                            }
+                            //((k*(N-1))+j)-1
+
+                            //var leaves = new List<Node<int>>();
+                            //leaves.Add(GetLeaves(EIG));
+                            // (int r = ((msg.From-1 * (round - 1) * (N)) - (N)); r < (msg.From * (round - 1) * (N)); r++)
+                            //
+
+                            /*  for (int r = ((msg.From * (round - 1) * (N)) - (N)); r < (msg.From * (round - 1) * (N)); r++)
+                              {
+                                  for (int c = 0; c < N-1; c++)
+                                  {
+
+                                      leaves[r].AddChild(new Node<int>(Convert.ToInt32(storedValues[c]), leaves[r].id + "."+ c.ToString()));
+
+                                      //Console.WriteLine("Child added at: r={0}, c={1}, stopping val:{2} ", r, c, (msg.From * (round - 1) * (N)));
+
+                                  }
+                                 // strValues.RemoveRange(0, N - 1);
+                              }*/
+
+                        }
+
+                        //Console.WriteLine("The number of children in tree: " + this.EIG.children.Count );
+                        //Console.WriteLine("Finished adding to tree");
+                        //if (msg.From > 2) Console.WriteLine("3  and 4 are making it through");
+                        // EIG.Add(msg.From, msg.Value);
+
+                        //TODO put into tree-- - - - - 
+                        //Receive message and put first round values into first row
+                        //  if(msg.Value.Length > 1)
+                        //  {
+                        //   var temp = msg.Value;
+                        //  var split = temp.Split(' ');
+                        //String[] values = split.Select(x => x.ToString()).ToArray<String>();
+                        //Figure out how to insert values into array at these points
+                        //Array is of length N(N-1)
+                        //insert N-1 values N times
+                        //  EIG[round][msg.From-1] = split;
+                        //  }
+                        //  else
+                        //  {
+                        //First round
+                        //EIG.Add(new TreeNode(round +"."+ msg.From +"."+ msg.Value));
+                        //Console.WriteLine(EIG[round][msg.From - 1]);
+                        // }
+
                     }
-
-                    //Console.WriteLine("The number of children in tree: " + this.EIG.children.Count );
-                    //Console.WriteLine("Finished adding to tree");
-                    //if (msg.From > 2) Console.WriteLine("3  and 4 are making it through");
-                   // EIG.Add(msg.From, msg.Value);
-                    
-                    //TODO put into tree-- - - - - 
-                    //Receive message and put first round values into first row
-                    //  if(msg.Value.Length > 1)
-                    //  {
-                    //   var temp = msg.Value;
-                    //  var split = temp.Split(' ');
-                    //String[] values = split.Select(x => x.ToString()).ToArray<String>();
-                    //Figure out how to insert values into array at these points
-                    //Array is of length N(N-1)
-                    //insert N-1 values N times
-                    //  EIG[round][msg.From-1] = split;
-                    //  }
-                    //  else
-                    //  {
-                    //First round
-                    //EIG.Add(new TreeNode(round +"."+ msg.From +"."+ msg.Value));
-                    //Console.WriteLine(EIG[round][msg.From - 1]);
-                   // }
-                    
                 }
                 //This is the synchronizer, start round two afterwards?
 
@@ -538,11 +597,11 @@ namespace ByzantineAgreementSync
                     Faulty = true;
                     //Since true read the script
                     //Expecting N + N strings, with second part being strings of length N-1
-                    string[] script = new string[N * 2];
-                    for (int j = 2; j < N * 2; j++)
+                    List<String> script = new List<String>();
+                    for (int j = 3; j < (N *( (N/3)+1))+3; j++)
                     {
                         //For creating string[] from script
-                        script[j - 2] = temp[j];
+                        script.Add(temp[j]);
                     }
                     Byzantines[i] = new ByzProcess(id, init, true, script, VZero);
                 }
@@ -578,6 +637,13 @@ namespace ByzantineAgreementSync
           //  Console.Out.WriteLine("The first byzantine is: " + generals[0].ID);
             CompletionCount = N = generals.Length;
             NumberOfRounds = (N / 3) + 1;
+            foreach(var general in generals)
+                {
+                    if (general.faulty)
+                    {
+                        general.generateTreeFromScript(general.script, general.EIG);
+                    }
+                }
             Completion = new TaskCompletionSource<bool>();
             
             round = 1;
@@ -597,7 +663,7 @@ namespace ByzantineAgreementSync
 
             Completion.Task.Wait();
         //    Console.WriteLine("Finished "+round+ " round messaging");
-            Thread.Sleep(1000);
+           // Thread.Sleep(1000);
 
                     /*    Byz2 = new MailboxProcessor<Message2>[N];
                             for (int i = 0; i < N; i++)
