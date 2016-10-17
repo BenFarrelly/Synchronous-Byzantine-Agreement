@@ -412,7 +412,7 @@ namespace ByzantineAgreementSync
             }
             public async Task ByzBody (MailboxProcessor<Message> inbox)
             {
-                
+                List<String> buffer = new List<String>();
                 for(var i=0; i < N; i++)
                 {
                     //    if(round == 1)
@@ -427,10 +427,13 @@ namespace ByzantineAgreementSync
                     else if (this.faulty)
                     {
                         mess = String.Concat(getLevel(round, this.fakeEIG, ""));
+                        
                     }
+
                    // var mes = mess.Append(getLevel(round, this.EIG)).ToString();
                    // Console.WriteLine("Message value: " + mess);
                     var msg = new Message(ID, mess);
+                    
                         Byz[i].Post(msg);
                       //  Console.WriteLine(round + " [" + ID + "]: Posting: " + msg.Value + " to " + (i + 1));
                   //  }
@@ -446,7 +449,7 @@ namespace ByzantineAgreementSync
                 }
                 // Console.WriteLine("BeforeBefore receive: " + ID + " ,  " );
                 //Buffer for storing messages, ensureing tree is built in order
-                List<Message> buffer = new List<Message>();
+               // List<Message> buffer = new List<Message>();
                 var leaves = new List<Node<int>>();
 
                 FindLeaves(EIG, leaves);
@@ -474,17 +477,32 @@ namespace ByzantineAgreementSync
                         }
                         else
                         {
+
+
+                        buffer.Add( msg.Value);
+                        if (i == N - 1)
+                        {
+                            //Console.WriteLine("making it in here");
+                            for(int k = 0; k < buffer.Count(); k++)
+                            {
+                                buffer[k] = buffer[k].Remove(k, 1);
+                            }
+                            List<char> bufferFlat = buffer.SelectMany(x => x).ToList<char>();
+                            var bufferFinal = bufferFlat.Select(x => x.ToString()).ToList<String>();
+                           // List<String> currentScript = buffer.GetRange(((i - 1) * N), N);
+                            //List<int> addingToLeaf = new List<int>();
                             //Need to remove the value that is from the node that is being stored
                             // Each leaf should not get the value from the node they represent
                             //E.G., if Node 1 is sending 0011 (where N=4), then the first leaf should
                             //have 011.
                             //If Node 3, sends 0011, then each third leaf will store 001
-                            var storedValues = receivedValues.ToArray();
-                            for (int j = msg.From - 1; j < receivedValues.Count; j += N)
-                            {
-                                storedValues[j] = null;
-                            }
-                            storedValues = storedValues.Where(x => x != null).ToArray<String>();
+                            // var storedValues = receivedValues.ToArray();
+                            //for (int j = msg.From - 1; j < receivedValues.Count; j += N)
+                            //{
+                            //    storedValues[j] = null;
+                            //}
+                            //storedValues = storedValues.Where(x => x != null).ToArray<String>();
+                            //Queue<String> q = new Queue<String>(storedValues);
                             //Now stored values does not include those from the ID
                             // Console.WriteLine("Values to be stored: ");
                             // foreach(var x in storedValues) { Console.WriteLine(x + " ,  "); }
@@ -493,13 +511,14 @@ namespace ByzantineAgreementSync
 
                             //var leafQueue = new Queue<Node<int>>(leaves);
                             //msg.Value is 0011 or something
-
-                            for (int j = 0; j < storedValues.Length; j++)
+                            //bufferFinal = 
+                            var valueQueue = new Queue(bufferFinal);
+                            for (int j = 0; j < leaves.Count; j++)
                             {
                                 var leaf = leavesQueue.Dequeue();
                                 for (int k = 0; k < N - 1; k++)
                                 {
-                                    leaf.AddChild(new Node<int>(Convert.ToInt32(storedValues[j]), leaf.id + "." + msg.From));
+                                    leaf.AddChild(new Node<int>(Convert.ToInt32(valueQueue.Dequeue()), leaf.id + "." + msg.From));
                                 }//was storedvalues[j] previously
                             }
                             //((k*(N-1))+j)-1
@@ -521,7 +540,7 @@ namespace ByzantineAgreementSync
                                   }
                                  // strValues.RemoveRange(0, N - 1);
                               }*/
-
+                        }
                         }
 
                         //Console.WriteLine("The number of children in tree: " + this.EIG.children.Count );
@@ -695,8 +714,16 @@ namespace ByzantineAgreementSync
                     for(int n = 0; n < N; n++)
                     {
                         //Generate output for the current level
-
-                        var result = String.Concat(generals[n].getOutput(round+1, generals[n].EIG, ""));
+                        var result = "";
+                        if (generals[n].faulty)
+                        {
+                            result = String.Concat(generals[n].getOutput(round + 1, generals[n].fakeEIG, ""));
+                        }
+                        else
+                        {
+                            result = String.Concat(generals[n].getOutput(round + 1, generals[n].EIG, ""));
+                        }
+                       String.Concat(generals[n].getOutput(round+1, generals[n].EIG, ""));
                         if(round == 1)
                         {
                             var result2 = result.Aggregate(string.Empty, (c, i) => c + i + ' ');
@@ -725,7 +752,7 @@ namespace ByzantineAgreementSync
                    generals[i].GenerateOutput();
                     Console.WriteLine();
                 }
-                Console.Read();
+              //  Console.Read();
             }
             else
         {
